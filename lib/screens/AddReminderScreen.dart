@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:notify_me/constants/colors.dart';
-import 'package:uuid/uuid.dart'; // Add this dependency for unique IDs
+import 'package:notify_me/models/reminder.dart';
+import 'package:notify_me/services/database_service.dart';
 import 'package:notify_me/services/notification_service.dart';
+import 'package:notify_me/constants/colors.dart';
+import 'package:uuid/uuid.dart';
 
 class AddReminderScreen extends StatefulWidget {
   const AddReminderScreen({super.key});
@@ -86,7 +88,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
     // Generate a unique ID for the reminder
     final String reminderId = const Uuid().v4();
-    final int notificationId = reminderId.hashCode;
+    final int notificationId = reminderId.hashCode.abs();
 
     // Schedule the notification
     await NotificationService().scheduleNotification(
@@ -96,6 +98,16 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
       scheduledDate: _selectedDateTime!,
     );
 
+    // Save the reminder to SQLite database
+    final reminder = Reminder(
+      id: reminderId,
+      title: _titleController.text,
+      dateTime: _selectedDateTime!,
+      notificationId: notificationId,
+    );
+
+    await DatabaseService().insertReminder(reminder);
+
     // Show success feedback
     if (!mounted) return;
 
@@ -103,13 +115,11 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Reminder set: ${_titleController.text}\nAt: ${_formatDateTime(_selectedDateTime)}',
+          'Reminder saved!\n"${_titleController.text}"\nAt: ${_formatDateTime(_selectedDateTime)}',
         ),
         backgroundColor: Colors.green,
       ),
     );
-
-    // Optionally: Save to local database or provider here too
 
     // Clear the form
     _titleController.clear();
