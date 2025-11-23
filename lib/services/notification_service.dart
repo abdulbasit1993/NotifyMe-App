@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:notify_me/constants/colors.dart';
 import 'package:permission_handler/permission_handler.dart'; // Add this
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -36,49 +37,12 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(initSettings);
   }
 
-  /// Requests notification permission on Android 13+
-  /// Returns true if permission is granted
-  Future<bool> requestPermission() async {
-    if (Platform.isIOS) return true; // iOS handles it via Darwin settings
-
-    if (Platform.isAndroid) {
-      final androidImpl = flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
-
-      // For Android 13+ (API 33+)
-      final bool? granted = await androidImpl?.requestNotificationsPermission();
-
-      // For older Android versions (<13), check via permission_handler
-      if (granted == null) {
-        final status = await Permission.notification.status;
-        if (!status.isGranted) {
-          final result = await Permission.notification.request();
-          return result.isGranted;
-        }
-        return true;
-      }
-
-      return granted ?? false;
-    }
-
-    return true;
-  }
-
   Future<void> scheduleNotification({
     required int id,
     required String title,
     required String body,
     required DateTime scheduledDate,
   }) async {
-    // Optional: Request permission right before scheduling (recommended)
-    final hasPermission = await requestPermission();
-    if (!hasPermission) {
-      debugPrint("Notification permission denied");
-      return;
-    }
-
     await flutterLocalNotificationsPlugin.zonedSchedule(
       id,
       title,
@@ -93,6 +57,13 @@ class NotificationService {
           priority: Priority.high,
           playSound: true,
           enableVibration: true,
+          enableLights: true,
+          ledColor: primaryColor,
+          ledOnMs: 1000,
+          ledOffMs: 500,
+          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          channelBypassDnd: true,
+          visibility: NotificationVisibility.public
         ),
         iOS: DarwinNotificationDetails(
           presentAlert: true,
@@ -102,5 +73,15 @@ class NotificationService {
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
+  }
+
+  // Cancels a scheduled notification by its ID
+  Future<void> cancelNotification(int id) async {
+    await flutterLocalNotificationsPlugin.cancel(id);
+  }
+
+  // Cancels all scheduled notifications (useful for debugging or logout)
+  Future<void> cancelAllNotifications() async {
+    await flutterLocalNotificationsPlugin.cancelAll();
   }
 }
